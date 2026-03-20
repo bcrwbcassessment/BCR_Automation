@@ -5,23 +5,36 @@ Run with:  streamlit run app.py
 """
 
 import csv
+import json
 import os
 import random
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from supabase import create_client
 
 # ---------------------------------------------------------------------------
 # Paths (all relative to this file so the app works from any working dir)
 # ---------------------------------------------------------------------------
-BASE_DIR          = Path(__file__).parent
-ACCESS_CODES_PATH = BASE_DIR / "ACCESS_CODES.csv"
-QUESTION_BANK_PATH= BASE_DIR / "QUESTION_BANK.csv"
-RESULTS_PATH      = BASE_DIR / "RESULTS.csv"
+BASE_DIR           = Path(__file__).parent
+ACCESS_CODES_PATH  = BASE_DIR / "ACCESS_CODES.csv"
+QUESTION_BANK_PATH = BASE_DIR / "QUESTION_BANK.csv"
+RESULTS_PATH       = BASE_DIR / "RESULTS.csv"
 
 QUESTIONS_PER_COURSE = 7
 OPTION_LETTERS       = ["A", "B", "C", "D", "E"]
+
+
+# ---------------------------------------------------------------------------
+# Supabase client  (one connection per process; secrets from .streamlit/secrets.toml)
+# ---------------------------------------------------------------------------
+@st.cache_resource
+def get_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +152,41 @@ def generate_exam(missing_courses: set[str], all_questions: list[dict]) -> list[
     return sampled.to_dict("records")
 
 
+def push_to_supabase(correct: int, total: int) -> str | None:
+    """
+    Push a single summary row to the Supabase bcr_results table.
+
+    Columns
+    -------
+    pin        text   — student access code
+    major      text   — Primary_Major from ANONYMOUS_DEMOGRAPHICS.csv (or "")
+    score      float  — percentage correct, rounded to 1 decimal
+    timestamp  text   — ISO-8601 datetime string
+    responses  text   — JSON array of every answer record from master_answers
+
+    Returns None on success, or an error string on failure.
+    """
+    submission_data = None
+    try:
+        submission_data = {
+            "pin":       str(st.session_state.pin),
+            "major":     "See Master Roster",
+            "score":     round(correct / total * 100, 1) if total else 0.0,
+            "timestamp": datetime.now().isoformat(),
+            "responses": json.dumps(list(st.session_state.master_answers.values())),
+        }
+
+        supabase = get_supabase()
+        supabase.table("bcr_results").insert(submission_data).execute()
+        return None
+
+    except Exception as e:
+        return (
+            f"Supabase insert failed — {type(e).__name__}: {e}\n\n"
+            f"Payload sent: {submission_data}"
+        )
+
+
 def write_results() -> tuple[int, int]:
     """
     Read every saved answer from master_answers (not from live widget state)
@@ -192,6 +240,7 @@ defaults = {
     "submitted":          False,
     "current_page_index": 0,     # which course section the student is viewing
     "master_answers":     {},    # persists every answer across page navigation
+    "supabase_error":     None,  # holds error string if Supabase push fails
 }
 for key, val in defaults.items():
     if key not in st.session_state:
@@ -347,7 +396,12 @@ elif not st.session_state.submitted:
             )
 
         if st.button("Submit Exam", type="primary", use_container_width=True):
-            write_results()                    # reads master_answers, not widget state
+            correct_count, _ = write_results()   # reads master_answers, not widget state
+            err = push_to_supabase(
+                correct_count,
+                len(st.session_state.exam_questions),
+            )
+            st.session_state.supabase_error = err
             st.session_state.submitted = True
             st.rerun()
 
@@ -379,3 +433,10 @@ else:
         "Your results have been saved. You may safely close this window.",
         icon="💾",
     )
+
+    if st.session_state.supabase_error:
+        st.error(
+            f"⚠️  Database sync failed (your CSV results are still saved).\n\n"
+            f"{st.session_state.supabase_error}",
+            icon="🛑",
+        )
