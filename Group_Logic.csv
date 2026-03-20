@@ -1,0 +1,48 @@
+,Classes,List,# Q's,,,,Course,# LOs,,Majors,Code
+,ALL,A,50,,,,ACCT 200,5,,Accounting (ACCT),ACCT
+Haven't taken,ACCT201 FINC300,B,40,,,,ACCT 201,5,,Business Analytics & Info Syst (BAIS),BAIS
+Haven't taken,BAIS220 BAIS302,C,44,,,,BAIS 210,3,,Business Analytics (BANL),BANL
+Haven't taken,BAIS302 BLAW300,D,42,,,,BAIS 211,3,,Economics (ECON),ECON
+Haven't taken,BAIS302 ECON 300,E,43,,,,BAIS 220,3,,Entrepreneurial Studies (ENTR),ENTR
+Haven't taken,ECON 300 BLAW300,F,41,,,,BAIS 302,3,,Entrepreneurship & Innovation (ENTI),ENTI
+Haven't taken,BAIS211,G,47,,,,BLAW 300,5,,Finance (FINC),FINC
+Haven't taken,BAIS220,H,47,,,,ECON 200,3,,International Business (INBU),INBU
+Haven't taken,BAIS302,I,47,,,,ECON 201,2,,Management (MGMT),MGMT
+Haven't taken,BLAW300,J,45,,,,ECON 300,4,,Marketing (MKTG),MKTG
+Haven't taken,ECON 300,K,46,,,,FINC 300,5,,Strategic Human Resource Mgmt (SHRM),SHRM
+Haven't taken,MGMT200,L,45,,,,MGMT 200,5,,,
+Haven't taken,BAIS211 BLAW300,M,42,,,,MKTG 300,4,,,
+Haven't taken,BAIS211 BAIS302,N,44,,,,,50,,,
+Haven't taken,ECON200 ECON201 FINC300,O,40,,,,,,,,
+Haven't taken,ACCT201,P,45,,,,,,,,
+Haven't taken,ACCT201 BAIS211 BAIS220 BLAW300 ECON200 ECON201 ECON300 FINC300 MGMT200,Q,15,,,,,,,,
+Haven't taken,ACCT201 BAIS220 BAIS302 BLAW300 ECON200 ECON201 ECON300,R,25,,,,,,,,
+Haven't taken,ACCT201 BAIS302 BLAW300 ECON200 ECON201,S,32,,,,,,,,
+Haven't taken,ACCT201 BAIS302 ECON200 ECON201,T,37,,,,,,,,
+Haven't taken,ACCT201 BLAW300 ECON300,U,36,,,,,,,,
+Haven't taken,ACCT201 ECON201,V,43,,,,,,,,
+Haven't taken,BAIS211 BAIS220 BAIS302 BLAW300 ECON300,W,32,,,,,,,,
+Haven't taken,BAIS211 BAIS220 BAIS302 BLAW300 FINC300,X,31,,,,,,,,
+Haven't taken,BAIS211 BAIS220 ECON200 ECON300 MGMT200,Y,32,,,,,,,,
+Haven't taken,BAIS211 BAIS302 BLAW300,Z,39,,,,,,,,
+Haven't taken,BAIS211 BAIS302 ECON200 ECON201,AA,39,,,,,,,,
+Haven't taken,BAIS211 BAIS302 ECON201 ECON300,AB,38,,,,,,,,
+Haven't taken,BAIS211 ECON300,AC,43,,,,,,,,
+Haven't taken,BAIS211 FINC300,AD,42,,,,,,,,
+Haven't taken,BAIS220 BAIS302 ECON200 ECON201,AE,39,,,,,,,,
+Haven't taken,BAIS220 ECON200 MGMT200,AF,39,,,,,,,,
+Haven't taken,BAIS220 ECON300,AG,43,,,,,,,,
+Haven't taken,BAIS220 ECON300 FINC300,AH,38,,,,,,,,
+Haven't taken,BAIS302 BLAW300 ECON300,AI,38,,,,,,,,
+Haven't taken,BAIS302 ECON200 ECON201,AJ,42,,,,,,,,
+Haven't taken,BAIS302 ECON201 ECON300,AK,41,,,,,,,,
+Haven't taken,BAIS302 ECON300 FINC300,AL,38,,,,,,,,
+Haven't taken,BAIS302 FINC300,AM,42,,,,,,,,
+Haven't taken,BAIS302 MGMT200,AN,42,,,,,,,,
+Haven't taken,BLAW300 ECON200,AO,42,,,,,,,,
+Haven't taken,BLAW300 ECON200 ECON300,AP,38,,,,,,,,
+Haven't taken,BLAW300 ECON201 ECON300,AQ,39,,,,,,,,
+Haven't taken,ECON200,AR,47,,,,,,,,
+Haven't taken,ECON200 ECON201,AS,45,,,,,,,,
+Haven't taken,ECON201,AT,48,,,,,,,,
+Haven't taken,FINC300,AU,45,,,,,,,,
