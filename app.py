@@ -7,7 +7,6 @@ Run with:  streamlit run app.py
 import csv
 import json
 import os
-import random
 from datetime import datetime
 from pathlib import Path
 
@@ -18,10 +17,10 @@ from supabase import create_client
 # ---------------------------------------------------------------------------
 # Paths (all relative to this file so the app works from any working dir)
 # ---------------------------------------------------------------------------
-BASE_DIR           = Path(__file__).parent
-ACCESS_CODES_PATH  = BASE_DIR / "ACCESS_CODES.csv"
-QUESTION_BANK_PATH = BASE_DIR / "QUESTION_BANK.csv"
-RESULTS_PATH       = BASE_DIR / "RESULTS.csv"
+BASE_DIR             = Path(__file__).parent
+STUDENT_ROSTER_PATH  = BASE_DIR / "STUDENT_ROSTER.csv"
+QUESTION_BANK_PATH   = BASE_DIR / "QUESTION_BANK.csv"
+RESULTS_PATH         = BASE_DIR / "RESULTS.csv"
 
 QUESTIONS_PER_COURSE = 7
 OPTION_LETTERS       = ["A", "B", "C", "D", "E"]
@@ -41,18 +40,16 @@ def get_supabase():
 # Data helpers  (cached so CSVs are only read once per Streamlit process)
 # ---------------------------------------------------------------------------
 @st.cache_data
-def load_access_codes() -> dict[str, str]:
-    """Returns {PIN: Missing_Courses_string}.
-    PIN keys are explicitly cast to str and stripped so the type is
-    guaranteed regardless of how the CSV was saved (e.g. pandas may
-    write integer columns without quotes, causing a type mismatch on
-    lookup if the key is not normalised here).
+def load_student_roster() -> dict[str, str]:
+    """Returns {email: Missing_Courses_string}.
+    Keys are normalized to lowercase and stripped so a typo or
+    mixed-case entry never locks a student out.
     """
-    codes = {}
-    with open(ACCESS_CODES_PATH, newline="", encoding="utf-8") as f:
+    roster = {}
+    with open(STUDENT_ROSTER_PATH, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
-            codes[str(row["PIN"]).strip()] = row["Missing_Courses"].strip()
-    return codes
+            roster[row["Email"].strip().lower()] = row["Missing_Courses"].strip()
+    return roster
 
 
 @st.cache_data
@@ -63,7 +60,7 @@ def load_question_bank() -> list[dict]:
 
 def parse_missing_courses(missing_str: str) -> set[str]:
     """
-    Convert the Missing_Courses string from ACCESS_CODES.csv into a normalised
+    Convert the Missing_Courses string from STUDENT_ROSTER.csv into a normalised
     set of course codes.  "ACCT 200 FINC 300" → {'ACCT200', 'FINC300'}
     'None' (or blank) → empty set (student completed everything).
     """
@@ -159,7 +156,7 @@ def push_to_supabase(correct: int, total: int) -> str | None:
     Columns
     -------
     pin        text   — student access code
-    major      text   — Primary_Major from ANONYMOUS_DEMOGRAPHICS.csv (or "")
+    major      text   — "See Master Roster" placeholder (demographics merged at report time)
     score      float  — percentage correct, rounded to 1 decimal
     timestamp  text   — ISO-8601 datetime string
     responses  text   — JSON array of every answer record from master_answers
@@ -264,33 +261,31 @@ if not st.session_state.logged_in:
 
     st.title("📋 Business Core Reflection")
     st.subheader("Student Assessment Portal")
-    st.write("Enter the 6-digit access code provided to you.")
+    st.write("Enter your Xavier University email address to begin.")
 
     with st.form("login_form"):
-        pin_input = st.text_input(
-            "6-Digit Access Code",
-            max_chars=6,
-            placeholder="______",
-            type="password",
+        email_input = st.text_input(
+            "Xavier Email Address",
+            placeholder="username@xavier.edu",
         )
         login_btn = st.form_submit_button("Start Assessment", use_container_width=True)
 
     if login_btn:
-        entered_pin   = str(pin_input).strip()
-        access_codes  = load_access_codes()
-        if entered_pin in access_codes:
+        entered_email = str(email_input).strip().lower()
+        roster        = load_student_roster()
+        if entered_email in roster:
             all_questions = load_question_bank()
-            missing       = parse_missing_courses(access_codes[entered_pin])
+            missing       = parse_missing_courses(roster[entered_email])
 
             st.session_state.logged_in          = True
-            st.session_state.pin                = entered_pin
+            st.session_state.pin                = entered_email
             st.session_state.exam_questions     = generate_exam(missing, all_questions)
             st.session_state.submitted          = False
             st.session_state.current_page_index = 0   # always start at section 1
             st.session_state.master_answers     = {}  # clear any previous session's answers
             st.rerun()                          # re-run immediately → exam screen
         else:
-            st.error("❌ Invalid access code. Please try again.")
+            st.error("❌ Email not found. Please verify your Xavier email address and try again.")
 
 
 # ===========================================================================
@@ -317,7 +312,7 @@ elif not st.session_state.submitted:
 
     # ── Page header ──────────────────────────────────────────────────────────
     st.title("Business Core Reflection Assessment")
-    st.caption(f"Access code: {st.session_state.pin}  •  Total questions: {len(exam)}")
+    st.caption(f"Logged in as: {st.session_state.pin}  •  Total questions: {len(exam)}")
     st.progress(
         (page_idx + 1) / total_pages,
         text=f"Section {page_idx + 1} of {total_pages}",
