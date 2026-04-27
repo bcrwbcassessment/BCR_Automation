@@ -21,6 +21,7 @@ BASE_DIR             = Path(__file__).parent
 STUDENT_ROSTER_PATH  = BASE_DIR / "STUDENT_ROSTER.csv"
 QUESTION_BANK_PATH   = BASE_DIR / "QUESTION_BANK.csv"
 RESULTS_PATH         = BASE_DIR / "RESULTS.csv"
+IMAGES_DIR           = BASE_DIR / "images"
 
 QUESTIONS_PER_COURSE = 7
 OPTION_LETTERS       = ["A", "B", "C", "D", "E"]
@@ -340,6 +341,14 @@ elif not st.session_state.submitted:
 
         qid = q.get("Question_ID", "")
         st.markdown(f"**{global_num}. {escape_md(q.get('Question_Text', ''))}**")
+
+        image_file = (q.get("Image_File", "") or "").strip()
+        if image_file:
+            try:
+                st.image(str(IMAGES_DIR / image_file))
+            except Exception:
+                st.caption("_(image unavailable)_")
+
         st.radio(
             label="answer",
             options=options,
