@@ -23,8 +23,8 @@ QUESTION_BANK_PATH   = BASE_DIR / "QUESTION_BANK.csv"
 RESULTS_PATH         = BASE_DIR / "RESULTS.csv"
 IMAGES_DIR           = BASE_DIR / "images"
 
-QUESTIONS_PER_COURSE = 7
-OPTION_LETTERS       = ["A", "B", "C", "D", "E"]
+MAX_COURSES    = 7              # Tier 1 cap: at most this many courses per student
+OPTION_LETTERS = ["A", "B", "C", "D", "E"]
 
 
 # ---------------------------------------------------------------------------
@@ -114,38 +114,61 @@ def save_answer(question_id: str, course: str, slo: str, correct_answer: str) ->
 
 def generate_exam(missing_courses: set[str], all_questions: list[dict]) -> list[dict]:
     """
-    Build a personalised exam using strict per-course sampling:
+    Build a personalised exam using two-tier stratified randomization that
+    mirrors the legacy Qualtrics pedagogy:
 
-    1. Load the full question bank into a DataFrame.
-    2. Filter OUT every course whose code appears in missing_courses
-       (those are courses the student has NOT yet completed and should
-       not be assessed on).
-    3. Group the remaining rows by Course and call .sample() on each
-       group to draw exactly QUESTIONS_PER_COURSE questions.
-       If a course has fewer questions than the target, all of them are
-       returned without raising an error.
-    4. Convert back to a list of plain dicts for the rest of the app.
+    Tier 1 — Course Selection (max MAX_COURSES):
+        From the courses the student is eligible for (i.e. has completed —
+        every course NOT listed in missing_courses), randomly sample at
+        most MAX_COURSES distinct courses.  If the student is eligible
+        for fewer, keep all of them.  No course is ever duplicated.
+
+    Tier 2 — Learning Objective Stratification:
+        Restrict the bank to the Tier-1 courses, then group by
+        (Course, Learning Objective) and draw exactly ONE question per
+        group.  This guarantees every learning objective in every
+        selected course is represented exactly once.
+
+    Final assembly:
+        Concatenate the per-LO samples and shuffle the full result so
+        questions from different courses are interleaved.
     """
     df = pd.DataFrame(all_questions)
 
-    # Boolean mask: True for every row whose course IS completed
-    completed_mask = ~df["Course"].isin(missing_courses)
-    df_completed   = df[completed_mask]
+    # The Learning Objective column in QUESTION_BANK.csv is "SLO" (values
+    # like "LO1", "LO2", …).  If the schema ever changes, halt loudly so
+    # the operator can clarify rather than silently producing a malformed
+    # exam.
+    LO_COLUMN = "SLO"
+    if LO_COLUMN not in df.columns:
+        raise KeyError(
+            f"Learning Objective column '{LO_COLUMN}' not found in "
+            f"QUESTION_BANK.csv. Available columns: {list(df.columns)}. "
+            f"Please clarify which column represents the Learning Objective."
+        )
 
-    if df_completed.empty:
+    # Restrict to courses the student has completed
+    df_eligible = df[~df["Course"].isin(missing_courses)]
+    if df_eligible.empty:
         return []
 
-    # Sample up to QUESTIONS_PER_COURSE rows per course group
-    sampled = (
-        df_completed
-        .groupby("Course", group_keys=False)
-        .apply(lambda g: g.sample(n=min(QUESTIONS_PER_COURSE, len(g))),
-               include_groups=False)
+    # ── Tier 1: pick up to MAX_COURSES distinct courses ───────────────
+    eligible_courses = df_eligible["Course"].unique().tolist()
+    n_courses        = min(MAX_COURSES, len(eligible_courses))
+    selected_courses = (
+        pd.Series(eligible_courses).sample(n=n_courses).tolist()
     )
 
-    # include_groups=False drops the "Course" column from the lambda's view;
-    # restore it by re-merging with the original Course values via the index.
-    sampled["Course"] = df_completed.loc[sampled.index, "Course"]
+    # ── Tier 2: exactly one question per (Course, LO) pair ────────────
+    df_selected = df_eligible[df_eligible["Course"].isin(selected_courses)]
+    per_lo_samples = [
+        group.sample(n=1)
+        for _, group in df_selected.groupby(["Course", LO_COLUMN])
+    ]
+    sampled = pd.concat(per_lo_samples, ignore_index=True)
+
+    # ── Final shuffle: mix questions across courses ───────────────────
+    sampled = sampled.sample(frac=1).reset_index(drop=True)
 
     return sampled.to_dict("records")
 
