@@ -93,16 +93,16 @@ def save_answer(question_id: str, course: str, slo: str, correct_answer: str) ->
 
     Streamlit fires this BEFORE the rerun that follows a selection change.
     At that moment the widget's new value is already committed to session_state
-    under its key, so we can read it and copy it into master_answers.
+    under its key, so we can read it and copy it into student_answers.
 
     When the student clicks Next/Previous, Streamlit destroys the off-screen
-    radio widgets and removes their keys from active widget state.  master_answers
+    radio widgets and removes their keys from active widget state.  student_answers
     is a plain dict in session_state — it is never touched by Streamlit's widget
     lifecycle — so every answer written here survives navigation intact.
     """
     raw      = st.session_state.get(question_id, "")
     s_letter = raw[0] if raw else ""
-    st.session_state.master_answers[question_id] = {
+    st.session_state.student_answers[question_id] = {
         "PIN":            st.session_state.pin,
         "Course":         course,
         "SLO":            slo,
@@ -183,7 +183,7 @@ def push_to_supabase(correct: int, total: int) -> str | None:
     major      text   — "See Master Roster" placeholder (demographics merged at report time)
     score      float  — percentage correct, rounded to 1 decimal
     timestamp  text   — ISO-8601 datetime string
-    responses  text   — JSON array of every answer record from master_answers
+    responses  text   — JSON array of every answer record from student_answers
 
     Returns None on success, or an error string on failure.
     """
@@ -194,7 +194,7 @@ def push_to_supabase(correct: int, total: int) -> str | None:
             "major":     "See Master Roster",
             "score":     round(correct / total * 100, 1) if total else 0.0,
             "timestamp": datetime.now().isoformat(),
-            "responses": json.dumps(list(st.session_state.master_answers.values())),
+            "responses": json.dumps(list(st.session_state.student_answers.values())),
         }
 
         supabase = get_supabase()
@@ -210,13 +210,13 @@ def push_to_supabase(correct: int, total: int) -> str | None:
 
 def write_results() -> tuple[int, int]:
     """
-    Read every saved answer from master_answers (not from live widget state)
+    Read every saved answer from student_answers (not from live widget state)
     and append them to RESULTS.csv.  Returns (correct_count, total_saved).
 
-    master_answers is keyed by Question_ID and each value is already a
+    student_answers is keyed by Question_ID and each value is already a
     complete record dict, so no grading logic is needed here.
     """
-    records       = list(st.session_state.master_answers.values())
+    records       = list(st.session_state.student_answers.values())
     correct_count = sum(1 for r in records if r.get("Is_Correct"))
     fieldnames    = ["PIN", "Course", "SLO", "Question_ID", "Student_Answer", "Is_Correct"]
     results_path_str = str(RESULTS_PATH)
@@ -260,7 +260,7 @@ defaults = {
     "exam_questions":     None,
     "submitted":          False,
     "current_page_index": 0,     # which course section the student is viewing
-    "master_answers":     {},    # persists every answer across page navigation
+    "student_answers":     {},    # persists every answer across page navigation
     "supabase_error":     None,  # holds error string if Supabase push fails
 }
 for key, val in defaults.items():
@@ -306,7 +306,7 @@ if not st.session_state.logged_in:
             st.session_state.exam_questions     = generate_exam(missing, all_questions)
             st.session_state.submitted          = False
             st.session_state.current_page_index = 0   # always start at section 1
-            st.session_state.master_answers     = {}  # clear any previous session's answers
+            st.session_state.student_answers     = {}  # clear any previous session's answers
             st.rerun()                          # re-run immediately → exam screen
         else:
             st.error("❌ Email not found. Please verify your Xavier email address and try again.")
@@ -372,11 +372,21 @@ elif not st.session_state.submitted:
             except Exception:
                 st.caption("_(image unavailable)_")
 
+        # Restore prior selection from student_answers so radios stay filled in
+        # after navigating away and back. Streamlit purges off-screen widget
+        # state, so on re-render we reconstruct the index from the persistent
+        # answer dict keyed by Question_ID.
+        saved_letter  = st.session_state.student_answers.get(qid, {}).get("Student_Answer", "")
+        default_index = next(
+            (idx for idx, opt in enumerate(options) if saved_letter and opt.startswith(f"{saved_letter}:")),
+            None,
+        )
+
         st.radio(
             label="answer",
             options=options,
             key=qid,                           # bare Question_ID — widget state key
-            index=None,
+            index=default_index,
             label_visibility="collapsed",
             on_change=save_answer,             # fires on every selection change
             args=(                             # positional args passed to save_answer
@@ -410,11 +420,11 @@ elif not st.session_state.submitted:
 
     # ── Submit — visible only on the final section ────────────────────────
     if is_last_page:
-        # Count unanswered from master_answers, not live widget state —
+        # Count unanswered from student_answers, not live widget state —
         # questions on earlier pages have no active widgets
         unanswered = sum(
             1 for q in exam
-            if q.get("Question_ID", "") not in st.session_state.master_answers
+            if q.get("Question_ID", "") not in st.session_state.student_answers
         )
         if unanswered:
             st.warning(
@@ -423,7 +433,7 @@ elif not st.session_state.submitted:
             )
 
         if st.button("Submit Exam", type="primary", use_container_width=True):
-            correct_count, _ = write_results()   # reads master_answers, not widget state
+            correct_count, _ = write_results()   # reads student_answers, not widget state
             err = push_to_supabase(
                 correct_count,
                 len(st.session_state.exam_questions),
@@ -437,9 +447,9 @@ elif not st.session_state.submitted:
 # SCREEN 3 — CONFIRMATION
 # ===========================================================================
 else:
-    # Re-compute score from master_answers — widget state is gone after submission
+    # Re-compute score from student_answers — widget state is gone after submission
     correct = sum(
-        1 for rec in st.session_state.master_answers.values()
+        1 for rec in st.session_state.student_answers.values()
         if rec.get("Is_Correct")
     )
     total = len(st.session_state.exam_questions)
