@@ -477,3 +477,5 @@ else:
             f"{st.session_state.supabase_error}",
             icon="🛑",
         )
+
+#forcing a cache reboot
